@@ -67,8 +67,13 @@ function Widget({ config, onConfigChange, size }) {
 - Keep widgets self-contained`
 
 export function ClawdbotProvider({ children }) {
+  // Auto-detect gateway URL: same host as the dashboard, port 8091 (proxy)
+  const defaultGatewayUrl = typeof window !== 'undefined' 
+    ? `http://${window.location.hostname}:8091`
+    : 'http://localhost:8091'
+
   const [gatewayUrl, setGatewayUrl] = useState(
-    () => localStorage.getItem('clawdpanels-gateway-url') || 'http://localhost:18789'
+    () => localStorage.getItem('clawdpanels-gateway-url') || defaultGatewayUrl
   )
   const [gatewayToken, setGatewayToken] = useState(
     () => localStorage.getItem('clawdpanels-gateway-token') || ''
