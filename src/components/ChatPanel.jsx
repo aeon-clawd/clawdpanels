@@ -63,12 +63,40 @@ export default function ChatPanel({ onClose }) {
           defaultConfig: {},
         })
         addMsg('system', `📌 Added to your dashboard.`)
-      } else {
-        // Normal response or failed compilation
+      } else if (result.error && result.widgetDef) {
+        // Compilation failed — auto-retry by asking agent to fix
         addMsg('agent', agentText)
-        if (result.error && result.widgetDef) {
-          addMsg('system', `⚠️ Widget code found but compilation failed: ${result.error}`)
+        addMsg('system', `⚠️ Compilation error: ${result.error}`)
+        addMsg('system', `🔄 Asking agent to fix...`)
+        
+        const fixConvo = [...newConversation, 
+          { role: 'assistant', content: agentText },
+          { role: 'user', content: `The widget code has a compilation error:\n\n${result.error}\n\nPlease fix the code and resend. Remember: function must be called "Widget", no imports, hooks are pre-injected (useState, useEffect, useRef, useCallback, useMemo). Send ONLY the corrected json and jsx code blocks.` }
+        ]
+        
+        try {
+          const fixedText = await sendMessage(fixConvo)
+          const fixResult = processWidgetResponse(fixedText)
+          
+          if (fixResult.success) {
+            const def = fixResult.definition
+            registerWidget(def)
+            addMsg('agent', fixedText)
+            addMsg('system', `✅ Fixed! Widget "${def.name}" compiled and registered.`)
+            addWidget(def.id, { defaultSize: def.defaultSize, minSize: def.minSize, defaultConfig: {} })
+            addMsg('system', `📌 Added to your dashboard.`)
+            setConversation([...fixConvo, { role: 'assistant', content: fixedText }])
+          } else {
+            addMsg('agent', fixedText)
+            addMsg('system', `❌ Still failing: ${fixResult.error}. Try simplifying your request.`)
+            setConversation([...fixConvo, { role: 'assistant', content: fixedText }])
+          }
+        } catch (fixErr) {
+          addMsg('system', `❌ Could not auto-fix: ${fixErr.message}`)
         }
+      } else {
+        // Normal text response (no widget code found)
+        addMsg('agent', agentText)
       }
     } catch (err) {
       // Check if it's a code paste (local mode)
