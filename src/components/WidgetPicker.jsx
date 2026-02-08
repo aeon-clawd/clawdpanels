@@ -6,6 +6,8 @@ export default function WidgetPicker({ onClose }) {
   const { addWidget } = useLayout()
 
   const widgets = listWidgets()
+  // Sort: builtin first, then custom
+  widgets.sort((a, b) => (b.builtin ? 1 : 0) - (a.builtin ? 1 : 0))
   const categories = [...new Set(widgets.map(w => w.category))]
 
   const handleAdd = (widget) => {

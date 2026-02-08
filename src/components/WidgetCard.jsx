@@ -1,10 +1,27 @@
 import { useState } from 'react'
+import ErrorBoundary from './ErrorBoundary'
 
 export default function WidgetCard({ 
   instanceId, definition, config, editMode, onRemove, onConfigChange, size 
 }) {
   const [configOpen, setConfigOpen] = useState(false)
   const Component = definition.component
+
+  if (!Component) {
+    return (
+      <div className="widget-card">
+        <div className="widget-header">
+          <div className="widget-header-left">
+            <span className="widget-icon">⚠️</span>
+            <span className="widget-title">Missing Component</span>
+          </div>
+        </div>
+        <div className="widget-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', fontSize: '13px' }}>
+          Widget "{definition.name}" has no component
+        </div>
+      </div>
+    )
+  }
 
   const mergedConfig = { ...getDefaults(definition.configSchema), ...config }
 
@@ -43,11 +60,13 @@ export default function WidgetCard({
       )}
 
       <div className="widget-body">
-        <Component 
-          config={mergedConfig} 
-          onConfigChange={onConfigChange}
-          size={size}
-        />
+        <ErrorBoundary>
+          <Component 
+            config={mergedConfig} 
+            onConfigChange={onConfigChange}
+            size={size}
+          />
+        </ErrorBoundary>
       </div>
     </div>
   )

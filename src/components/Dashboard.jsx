@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useState, useEffect } from 'react'
+import { useMemo, useCallback, useRef, useState, useEffect, Fragment } from 'react'
 import { Responsive } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
@@ -27,6 +27,15 @@ export default function Dashboard({ editMode }) {
   const { getWidget } = useWidgetRegistry()
   const containerRef = useRef(null)
   const width = useWidth(containerRef)
+  const prevLenRef = useRef(layout.length)
+
+  // Auto-scroll when a new widget is added
+  useEffect(() => {
+    if (layout.length > prevLenRef.current) {
+      setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 300)
+    }
+    prevLenRef.current = layout.length
+  }, [layout.length])
 
   const gridLayout = useMemo(() => 
     layout.map(item => ({
