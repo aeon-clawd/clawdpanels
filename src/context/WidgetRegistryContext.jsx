@@ -6,6 +6,7 @@ import NotesWidget from '../widgets/notes/Widget'
 import CountdownWidget from '../widgets/countdown/Widget'
 import PortfolioWidget from '../widgets/portfolio/Widget'
 import ServicesWidget from '../widgets/services/Widget'
+import WodWidget from '../widgets/wod/Widget'
 
 const WidgetRegistryContext = createContext()
 
@@ -84,6 +85,20 @@ const BUILTIN_WIDGETS = {
     component: PortfolioWidget,
     configSchema: {
       positions: { type: 'json', default: '[]', label: 'Positions (JSON)' },
+    }
+  },
+  wod: {
+    id: 'wod',
+    name: 'WOD del Día',
+    description: 'Clases de CrossFit hoy (AimHarder)',
+    icon: '🏋️',
+    category: 'fitness',
+    builtin: true,
+    defaultSize: { w: 4, h: 4 },
+    minSize: { w: 3, h: 3 },
+    component: WodWidget,
+    configSchema: {
+      apiHost: { type: 'string', default: '', label: 'API Host (auto-detect if empty)' },
     }
   },
   services: {
