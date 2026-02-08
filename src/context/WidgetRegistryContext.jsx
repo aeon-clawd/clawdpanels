@@ -5,6 +5,7 @@ import WeatherWidget from '../widgets/weather/Widget'
 import NotesWidget from '../widgets/notes/Widget'
 import CountdownWidget from '../widgets/countdown/Widget'
 import PortfolioWidget from '../widgets/portfolio/Widget'
+import ServicesWidget from '../widgets/services/Widget'
 
 const WidgetRegistryContext = createContext()
 
@@ -83,6 +84,21 @@ const BUILTIN_WIDGETS = {
     component: PortfolioWidget,
     configSchema: {
       positions: { type: 'json', default: '[]', label: 'Positions (JSON)' },
+    }
+  },
+  services: {
+    id: 'services',
+    name: 'Services Monitor',
+    description: 'VPS services and containers status',
+    icon: '🖥️',
+    category: 'system',
+    builtin: true,
+    defaultSize: { w: 4, h: 4 },
+    minSize: { w: 3, h: 3 },
+    component: ServicesWidget,
+    configSchema: {
+      apiHost: { type: 'string', default: '', label: 'API Host (auto-detect if empty)' },
+      refreshInterval: { type: 'string', default: '30', label: 'Refresh interval (seconds)' },
     }
   },
 }
