@@ -16,8 +16,30 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
  */
 export function compileWidget(jsxCode) {
   try {
+    // Clean up the code — sometimes agents include non-JS content
+    let cleanCode = jsxCode.trim()
+    
+    // If code doesn't start with 'function' or 'const' or '//', 
+    // try to find where the actual function starts
+    if (!cleanCode.match(/^(function |const |let |\/\/|\/\*|export )/)) {
+      const funcStart = cleanCode.search(/function\s+Widget/)
+      if (funcStart > 0) {
+        cleanCode = cleanCode.slice(funcStart)
+      } else {
+        // Maybe it's wrapped in something weird, try to extract function block
+        const funcMatch = cleanCode.match(/(function\s+Widget[\s\S]*$)/)
+        if (funcMatch) {
+          cleanCode = funcMatch[1]
+        }
+      }
+    }
+    
+    // Remove any 'export default' or 'export' keywords (not supported in our scope)
+    cleanCode = cleanCode.replace(/^export\s+default\s+/gm, '')
+    cleanCode = cleanCode.replace(/^export\s+/gm, '')
+
     // Transform JSX to JS
-    const { code } = transform(jsxCode, {
+    const { code } = transform(cleanCode, {
       transforms: ['jsx'],
       jsxRuntime: 'classic',
       production: true,
@@ -87,8 +109,21 @@ export function parseWidgetFromResponse(text) {
   // Try to find all JSON blocks
   const jsonBlocks = [...text.matchAll(/```json\s*([\s\S]*?)```/g)]
   
-  // Try to find JSX/code block
-  const codeMatch = text.match(/```(?:jsx?|tsx?)\s*([\s\S]*?)```/)
+  // Try to find JSX/code blocks — get ALL of them
+  const codeBlocks = [...text.matchAll(/```(?:jsx?|tsx?)\s*([\s\S]*?)```/g)]
+  
+  // Find the code block that actually contains a Widget function
+  let codeMatch = null
+  for (const block of codeBlocks) {
+    if (block[1].includes('function Widget') || block[1].includes('Widget(')) {
+      codeMatch = block
+      break
+    }
+  }
+  // Fallback to last code block if none has Widget
+  if (!codeMatch && codeBlocks.length > 0) {
+    codeMatch = codeBlocks[codeBlocks.length - 1]
+  }
 
   let widgetDef = null
 
