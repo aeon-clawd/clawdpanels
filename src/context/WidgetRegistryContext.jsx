@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { compileWidget } from '../lib/widgetCompiler'
 import ClockWidget from '../widgets/clock/Widget'
 import WeatherWidget from '../widgets/weather/Widget'
 import NotesWidget from '../widgets/notes/Widget'
@@ -6,6 +7,8 @@ import CountdownWidget from '../widgets/countdown/Widget'
 import PortfolioWidget from '../widgets/portfolio/Widget'
 
 const WidgetRegistryContext = createContext()
+
+const STORAGE_KEY = 'clawdpanels-custom-widgets'
 
 // Built-in widget definitions
 const BUILTIN_WIDGETS = {
@@ -84,14 +87,83 @@ const BUILTIN_WIDGETS = {
   },
 }
 
+// Load custom widgets from localStorage and recompile them
+function loadCustomWidgets() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (!saved) return {}
+    
+    const customs = JSON.parse(saved)
+    const compiled = {}
+    
+    for (const [id, def] of Object.entries(customs)) {
+      if (def.code) {
+        const result = compileWidget(def.code)
+        if (result.success) {
+          compiled[id] = {
+            ...def,
+            component: result.component,
+            builtin: false,
+          }
+        } else {
+          console.warn(`Failed to recompile widget ${id}:`, result.error)
+        }
+      }
+    }
+    
+    return compiled
+  } catch {
+    return {}
+  }
+}
+
+// Save custom widget metadata + code to localStorage (no component serialization)
+function saveCustomWidgets(registry) {
+  const customs = {}
+  for (const [id, def] of Object.entries(registry)) {
+    if (!def.builtin && def.code) {
+      customs[id] = {
+        id: def.id,
+        name: def.name,
+        description: def.description,
+        icon: def.icon,
+        category: def.category,
+        defaultSize: def.defaultSize,
+        minSize: def.minSize,
+        configSchema: def.configSchema,
+        code: def.code,
+      }
+    }
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(customs))
+}
+
 export function WidgetRegistryProvider({ children }) {
-  const [registry, setRegistry] = useState(BUILTIN_WIDGETS)
+  const [registry, setRegistry] = useState(() => {
+    const customs = loadCustomWidgets()
+    return { ...BUILTIN_WIDGETS, ...customs }
+  })
+
+  // Persist custom widgets whenever registry changes
+  useEffect(() => {
+    saveCustomWidgets(registry)
+  }, [registry])
 
   const registerWidget = (definition) => {
     setRegistry(prev => ({
       ...prev,
       [definition.id]: { ...definition, builtin: false }
     }))
+  }
+
+  const unregisterWidget = (widgetId) => {
+    setRegistry(prev => {
+      const next = { ...prev }
+      if (next[widgetId] && !next[widgetId].builtin) {
+        delete next[widgetId]
+      }
+      return next
+    })
   }
 
   const getWidget = (widgetId) => registry[widgetId] || null
@@ -103,7 +175,7 @@ export function WidgetRegistryProvider({ children }) {
 
   return (
     <WidgetRegistryContext.Provider value={{ 
-      registry, registerWidget, getWidget, listWidgets, listByCategory 
+      registry, registerWidget, unregisterWidget, getWidget, listWidgets, listByCategory 
     }}>
       {children}
     </WidgetRegistryContext.Provider>
