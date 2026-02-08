@@ -24,6 +24,7 @@ export function compileWidget(jsxCode) {
     })
 
     // Create a module scope with React and hooks available
+    // Also alias React.useState etc. since some models use that pattern
     const moduleScope = new Function(
       'React',
       'useState',
@@ -32,6 +33,13 @@ export function compileWidget(jsxCode) {
       'useCallback',
       'useMemo',
       `
+      // Ensure React.useState etc. also work
+      if (!React.useState) React.useState = useState;
+      if (!React.useEffect) React.useEffect = useEffect;
+      if (!React.useRef) React.useRef = useRef;
+      if (!React.useCallback) React.useCallback = useCallback;
+      if (!React.useMemo) React.useMemo = useMemo;
+      
       ${code}
       
       // Return the Widget component (try common export patterns)
@@ -76,30 +84,43 @@ export function compileWidget(jsxCode) {
  * ```
  */
 export function parseWidgetFromResponse(text) {
-  // Try to find JSON block in the response
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || 
-                    text.match(/```\s*({\s*"widget"[\s\S]*?})```/)
+  // Try to find all JSON blocks
+  const jsonBlocks = [...text.matchAll(/```json\s*([\s\S]*?)```/g)]
   
   // Try to find JSX/code block
   const codeMatch = text.match(/```(?:jsx?|tsx?)\s*([\s\S]*?)```/)
 
   let widgetDef = null
 
-  // Parse JSON definition if found
-  if (jsonMatch) {
+  // Look through JSON blocks for widget metadata
+  for (const match of jsonBlocks) {
     try {
-      const parsed = JSON.parse(jsonMatch[1])
-      widgetDef = parsed.widget || parsed
+      const parsed = JSON.parse(match[1])
+      // Check if this looks like widget metadata (has id, name, or widget key)
+      if (parsed.widget) {
+        widgetDef = parsed.widget
+        break
+      }
+      if (parsed.id && parsed.name) {
+        widgetDef = parsed
+        break
+      }
+      // Skip JSON blocks that are just data (arrays, configs without id/name)
     } catch (e) {
       // Not valid JSON, continue
     }
   }
 
-  // If we have a code block but no JSON, create a basic definition
+  // If we have a code block but no proper JSON metadata, create a basic definition
+  // Try to infer name from the code or surrounding text
   if (!widgetDef && codeMatch) {
+    // Try to extract a name from the text before the code block
+    const nameMatch = text.match(/(?:create|build|make|here's|here is).*?(?:a |an |the )(.+?)(?:widget|component)/i)
+    const inferredName = nameMatch ? nameMatch[1].trim() : 'Custom Widget'
+    
     widgetDef = {
       id: `custom-${Date.now()}`,
-      name: 'Custom Widget',
+      name: inferredName.charAt(0).toUpperCase() + inferredName.slice(1),
       description: 'Created by agent',
       icon: '🧩',
       category: 'general',
@@ -111,6 +132,15 @@ export function parseWidgetFromResponse(text) {
   // If JSON def has separate code block, merge
   if (widgetDef && !widgetDef.code && codeMatch) {
     widgetDef.code = codeMatch[1].trim()
+  }
+
+  // Ensure required fields
+  if (widgetDef) {
+    widgetDef.id = widgetDef.id || `custom-${Date.now()}`
+    widgetDef.name = widgetDef.name || 'Custom Widget'
+    widgetDef.icon = widgetDef.icon || '🧩'
+    widgetDef.category = widgetDef.category || 'general'
+    widgetDef.defaultSize = widgetDef.defaultSize || { w: 4, h: 3 }
   }
 
   return widgetDef
